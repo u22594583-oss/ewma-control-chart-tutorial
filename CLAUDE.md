@@ -8,20 +8,20 @@ This is a self-contained educational Jupyter notebook repository (not a software
 
 - `EWMA_Control_Chart_Tutorial.ipynb` — a from-scratch, beginner-oriented walkthrough of the Exponentially Weighted Moving Average (EWMA) control chart: statistic definition, mean/variance derivation, exact vs. asymptotic control limits, simulated in-control/shifted process examples, and Average Run Length (ARL) performance analysis via Monte Carlo simulation.
 
-There is no application code, build system, package structure, or test suite — this is not a git repository. Treat each notebook as the unit of work.
+There is no application code, build system, or package structure, and no test suite. Treat each notebook as the unit of work.
 
 ## Environment
 
-No `requirements.txt`/`environment.yml` exists. Packages are installed into the user site-packages (`pip install --user`, no venv). Required packages: `numpy`, `pandas`, `matplotlib`, `nbformat`, `nbclient`, `ipykernel`.
+No `requirements.txt`/`environment.yml` exists. A `.venv` (Python 3.14, created with `python -m venv`) lives at the repo root — use its interpreter rather than a global/user install. The venv normally has `numpy`, `pandas`, `matplotlib`, `ipykernel` but is missing `nbformat`/`nbclient`, which the execution workflow below requires; install them before executing notebooks:
 
 ```bash
-python -m pip install numpy pandas matplotlib nbformat nbclient ipykernel
-python -m ipykernel install --user --name python3 --display-name "Python 3"
+./.venv/Scripts/python.exe -m pip install numpy pandas matplotlib nbformat nbclient ipykernel
+./.venv/Scripts/python.exe -m ipykernel install --user --name python3 --display-name "Python 3"
 ```
 
 ## Running / executing notebooks
 
-There is no `jupyter` console entry point installed (`python -m jupyter execute` fails with "command not found"). Execute notebooks headlessly via `nbclient`'s Python API instead of the Jupyter CLI:
+`nbconvert` is not installed in the venv, so the `jupyter` CLI's `jupyter execute` subcommand is unavailable. Execute notebooks headlessly via `nbclient`'s Python API instead:
 
 ```python
 import nbformat
@@ -34,7 +34,7 @@ client.execute()
 nbformat.write(nb, path)  # saves outputs back into the notebook
 ```
 
-After executing, scan `nb.cells` for `output_type == "error"` to confirm every cell ran cleanly — there is no other CI/test mechanism in this repo.
+Run this with `./.venv/Scripts/python.exe`. After executing, scan `nb.cells` for `output_type == "error"` to confirm every cell ran cleanly — there is no other CI/test mechanism in this repo.
 
 ## Authoring conventions established in this notebook
 
