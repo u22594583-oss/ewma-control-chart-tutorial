@@ -4,11 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository purpose
 
-This is a self-contained educational Jupyter notebook repository (not a software package/app) for the STK 795 postgraduate course. It currently contains three notebooks:
+This is a self-contained educational Jupyter notebook repository (not a software package/app) for the STK 795 postgraduate course. It currently contains four notebooks:
 
 - `EWMA_Control_Chart_Tutorial.ipynb` — a from-scratch, beginner-oriented walkthrough of the Exponentially Weighted Moving Average (EWMA) control chart: statistic definition, mean/variance derivation, exact vs. asymptotic control limits, simulated in-control/shifted process examples, and Average Run Length (ARL) performance analysis via Monte Carlo simulation.
 - `SVM_and_OneClassSVM_Tutorial.ipynb` — a from-scratch, beginner-oriented walkthrough of the Support Vector Machine (margin geometry, hard/soft-margin optimization, the dual problem, the kernel trick) and the One-Class SVM (novelty/outlier detection without labels), with `scikit-learn` used for the actual model fitting.
 - `Dog_Breed_CNN_Tutorial.ipynb` — a from-scratch, beginner-oriented walkthrough of a Convolutional Neural Network (convolution, padding/stride, ReLU, pooling, dense/softmax head, cross-entropy loss, backprop/Adam), built and trained with PyTorch on a small self-scraped Wikimedia Commons dog-breed image dataset (5 breeds). See "Data scraping gotchas" below before re-running its data-collection cell.
+- `Stock_Price_Forecast_Tutorial.ipynb` — a from-scratch, beginner-oriented Monte Carlo stock price forecast: downloads real historical prices for an S&P 500 ticker via `yfinance`, calibrates a Geometric Brownian Motion model from historical log returns, simulates thousands of 6-month-ahead price paths, and renders an interactive Plotly fan chart with a slider to browse individual simulated scenarios. Needs internet access (Yahoo Finance) each time the data-download cell runs.
 
 There is no application code, build system, or package structure, and no test suite. Treat each notebook as the unit of work.
 
@@ -17,12 +18,13 @@ There is no application code, build system, or package structure, and no test su
 No `requirements.txt`/`environment.yml` exists. A `.venv` (Python 3.14, created with `python -m venv`) lives at the repo root — use its interpreter rather than a global/user install. Install with:
 
 ```bash
-./.venv/Scripts/python.exe -m pip install numpy pandas matplotlib scikit-learn nbformat nbclient ipykernel torch torchvision requests tqdm
+./.venv/Scripts/python.exe -m pip install numpy pandas matplotlib scikit-learn nbformat nbclient ipykernel torch torchvision requests tqdm yfinance plotly
 ./.venv/Scripts/python.exe -m ipykernel install --user --name python3 --display-name "Python 3"
 ```
 
 - `nbformat`/`nbclient` are needed for the headless execution workflow below and are not installed by default.
 - `torch`/`torchvision` (CPU wheels) are only needed for `Dog_Breed_CNN_Tutorial.ipynb`. **Do not install `tensorflow`/Keras into this venv** — TensorFlow has no published wheel for Python 3.14 (confirmed 2026-07); PyTorch was chosen specifically because it publishes `cp314` Windows wheels and lets this repo keep a single venv. (The sibling `STK 795/CNN SVM` project uses TensorFlow/Keras in its own separate Python 3.12 venv — that constraint doesn't apply here.)
+- `yfinance`/`plotly` are only needed for `Stock_Price_Forecast_Tutorial.ipynb` (data download + the interactive fan chart).
 - `data/` (the CNN notebook's downloaded image dataset) and `.venv/` are gitignored — never commit either.
 
 ## Running / executing notebooks
@@ -60,3 +62,4 @@ When adding to or creating notebooks in this repo, follow the pattern set by `EW
 - **Plot style**: a shared `plt.rcParams.update({...})` block and a small named color palette are set once in the setup cell and reused across all figures for visual consistency. The EWMA notebook's palette (`COL_DATA`, `COL_CL`, `COL_LIMITS`, `COL_OOC`) is specific to control charts; the SVM and CNN notebooks instead draw fixed per-category colors from the `dataviz` skill's validated categorical palette (`references/palette.md`) — e.g. the CNN notebook's `BREED_COLOR` dict maps each breed to one fixed hex color, assigned once and never reassigned/cycled, so a color always means the same class everywhere in the notebook.
 - **Course notation**: this course's control-chart material (see sibling `STK 795/Programming material/*.sas` scripts) uses "Case K" (known in-control parameters, μ0/σ0 given rather than estimated). When extending this notebook or adding related ones (e.g. Shewhart, CUSUM, MEWMA), match that notation and, where relevant, the course's tuned parameter values (e.g. λ=0.05, L=2.4859, n=5, targeting ARL0≈370) so results are comparable across notebooks.
 - **ARL estimation**: no closed-form ARL exists for EWMA; it is estimated by Monte Carlo (simulate many runs, record the run length to first out-of-control signal, average). Use the notebook's `simulate_run_length` / `estimate_arl` helper pattern (asymptotic/steady-state control limits, not exact time-varying ones, per standard ARL-study convention) as the template for similar performance studies.
+- **Interactive charts** (`Stock_Price_Forecast_Tutorial.ipynb`'s slider fan chart) use Plotly with `pio.renderers.default = "notebook"`, which embeds the full `plotly.js` bundle in the first figure's output. This keeps the chart interactive (drag/hover/zoom) even without a live kernel or internet connection when the notebook is reopened later, at the cost of a multi-MB notebook file — that file-size increase is expected, not a sign something went wrong. Slider steps use Plotly `restyle` (updating one trace's data directly) rather than `frames`, which is simpler and avoids animation-frame bookkeeping for a "browse N precomputed scenarios" interaction.
