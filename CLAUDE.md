@@ -4,12 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository purpose
 
-This is a self-contained educational Jupyter notebook repository (not a software package/app) for the STK 795 postgraduate course. It currently contains four notebooks:
-
-- `EWMA_Control_Chart_Tutorial.ipynb` — a from-scratch, beginner-oriented walkthrough of the Exponentially Weighted Moving Average (EWMA) control chart: statistic definition, mean/variance derivation, exact vs. asymptotic control limits, simulated in-control/shifted process examples, and Average Run Length (ARL) performance analysis via Monte Carlo simulation.
-- `SVM_and_OneClassSVM_Tutorial.ipynb` — a from-scratch, beginner-oriented walkthrough of the Support Vector Machine (margin geometry, hard/soft-margin optimization, the dual problem, the kernel trick) and the One-Class SVM (novelty/outlier detection without labels), with `scikit-learn` used for the actual model fitting.
-- `Dog_Breed_CNN_Tutorial.ipynb` — a from-scratch, beginner-oriented walkthrough of a Convolutional Neural Network (convolution, padding/stride, ReLU, pooling, dense/softmax head, cross-entropy loss, backprop/Adam), built and trained with PyTorch on a small self-scraped Wikimedia Commons dog-breed image dataset (5 breeds). See "Data scraping gotchas" below before re-running its data-collection cell.
-- `Stock_Price_Forecast_Tutorial.ipynb` — a from-scratch, beginner-oriented Monte Carlo stock price forecast: downloads real historical prices for an S&P 500 ticker via `yfinance`, calibrates a Geometric Brownian Motion model from historical log returns, simulates thousands of 6-month-ahead price paths, and renders an interactive Plotly fan chart with a slider to browse individual simulated scenarios. Needs internet access (Yahoo Finance) each time the data-download cell runs.
+This is a self-contained educational Jupyter notebook repository (not a software package/app) for the STK 795 postgraduate course. Each `*_Tutorial.ipynb` at the repo root is a from-scratch, beginner-oriented tutorial notebook; a notebook's opening markdown cell states its scope. Two need internet when (re)run: `Dog_Breed_CNN_Tutorial.ipynb` (Wikimedia Commons image download — see "Data scraping gotchas" below first) and `Stock_Price_Forecast_Tutorial.ipynb` (Yahoo Finance via `yfinance`).
 
 There is no application code, build system, or package structure, and no test suite. Treat each notebook as the unit of work.
 
