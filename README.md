@@ -8,6 +8,12 @@ bottom reproduces its results exactly.
 
 ## The notebooks
 
+### Statistics foundations
+
+| Notebook | What it teaches |
+|---|---|
+| `Gaussian_White_Noise_Tutorial.ipynb` | Gaussian white noise from scratch: the normal density and the 68–95–99.7 rule, what "white" means (zero autocorrelation, no memory), a Central Limit Theorem demo, signal-to-noise ratio, and the σ/√n averaging law — with interactive sliders adding noise to four deterministic signals. |
+
 ### Statistical process control
 
 | Notebook | What it teaches |
@@ -34,8 +40,8 @@ bottom reproduces its results exactly.
 `conv1d_autoencoder.py` is a plain-script version of the autoencoder tutorial's
 pipeline (same seed, identical results, no tutorial prose).
 
-**Suggested order** if you are new to all of it: EWMA → MEWMA → SVM → Dog Breed CNN →
-1D Autoencoder → Hybrid. The stock forecast notebook stands alone.
+**Suggested order** if you are new to all of it: Gaussian noise → EWMA → MEWMA → SVM →
+Dog Breed CNN → 1D Autoencoder → Hybrid. The stock forecast notebook stands alone.
 
 ## Setup
 
