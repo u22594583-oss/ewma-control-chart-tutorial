@@ -1,0 +1,656 @@
+<title>MEWMA Control Chart Explorer</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1:       #2a78d6;
+    --series-6:       #eb6834;
+    --critical:       #d03b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --series-1:       #3987e5;
+      --series-6:       #d95926;
+      --critical:       #d03b3b;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --series-1:       #3987e5;
+    --series-6:       #d95926;
+    --critical:       #d03b3b;
+  }
+
+  * { box-sizing: border-box; }
+  .viz-root {
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 24px 20px 60px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 4px; text-wrap: balance; }
+  .subtitle { color: var(--text-secondary); font-size: 0.92rem; margin: 0 0 18px; max-width: 74ch; line-height: 1.5; }
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+  }
+  .card h2 { font-size: 1.02rem; margin: 0 0 12px; }
+  .controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px 22px;
+  }
+  .control { display: flex; flex-direction: column; gap: 4px; }
+  .control label {
+    font-size: 0.82rem; color: var(--text-secondary); display: flex; justify-content: space-between;
+  }
+  .control label .val { color: var(--text-primary); font-variant-numeric: tabular-nums; font-weight: 600; }
+  input[type="range"] { width: 100%; accent-color: var(--series-1); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+  button {
+    font: inherit; font-size: 0.8rem; padding: 5px 11px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--series-1); }
+  button.primary { background: var(--series-1); color: #fff; border-color: transparent; }
+  button.active { outline: 2px solid var(--series-1); }
+  select {
+    font: inherit; font-size: 0.82rem; padding: 4px 6px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  }
+  button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--series-1); outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #tooltip { transition: none; }
+  }
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+  }
+  .chart-panel svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .chart-title { font-size: 0.88rem; font-weight: 600; margin: 0 0 6px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.74rem; color: var(--text-secondary); margin-top: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .swatch.line { width: 14px; height: 2px; border-radius: 0; }
+  .swatch.dash { width: 14px; height: 0; border-top: 2px dashed var(--text-muted); }
+  #status {
+    font-size: 0.85rem; line-height: 1.7; color: var(--text-secondary);
+  }
+  #status b { color: var(--text-primary); }
+  #status .flag-ooc { color: var(--critical); font-weight: 700; }
+  #status .flag-ok { color: var(--text-primary); font-weight: 700; }
+  #tooltip {
+    position: fixed; pointer-events: none; opacity: 0; transition: opacity 0.08s;
+    background: var(--text-primary); color: var(--surface-1);
+    font-size: 0.72rem; padding: 5px 8px; border-radius: 5px; z-index: 20;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  :root[data-theme="dark"] #tooltip, @media (prefers-color-scheme: dark) { }
+  details.math summary { cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+  details.math .body { font-size: 0.85rem; line-height: 1.75; color: var(--text-secondary); margin-top: 10px; }
+  details.math code { background: var(--page-plane); padding: 1px 5px; border-radius: 4px; font-size: 0.82em; }
+  footer { font-size: 0.74rem; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
+  .axis-label, .tick-label { fill: var(--text-muted); font-size: 9.5px; }
+  .grid-line { stroke: var(--gridline); stroke-width: 1; }
+  .baseline-line { stroke: var(--baseline); stroke-width: 1; }
+</style>
+
+<div class="viz-root">
+  <h1>MEWMA Control Chart Explorer</h1>
+  <p class="subtitle">
+    A hands-on companion to <code>MEWMA_Control_Chart_Tutorial.ipynb</code>. Turn the knobs below to see how the
+    smoothing parameter &lambda;, the correlation &rho; between two monitored variables, and the size/direction of a
+    process shift interact to determine how quickly the MEWMA chart signals &mdash; and why a shift's <em>direction</em>
+    relative to the correlation matters just as much as its size. Fixed at <b>p&nbsp;=&nbsp;2</b> variables so the
+    geometry stays visible; the notebook's math generalizes to any number of variables.
+  </p>
+
+  <div class="card">
+    <h2>Knobs</h2>
+    <div class="controls-grid">
+      <div class="control">
+        <label>Smoothing weight &lambda; <span class="val" id="lamVal"></span></label>
+        <input type="range" id="lam" min="0.05" max="1" step="0.01" value="0.10">
+      </div>
+      <div class="control">
+        <label>Correlation &rho; <span class="val" id="rhoVal"></span></label>
+        <input type="range" id="rho" min="-0.95" max="0.95" step="0.01" value="0.80">
+      </div>
+      <div class="control">
+        <label>Chart length n <span class="val" id="nVal"></span></label>
+        <input type="range" id="nObs" min="20" max="100" step="1" value="50">
+      </div>
+      <div class="control">
+        <label>Shift magnitude c (&sigma; units) <span class="val" id="cVal"></span></label>
+        <input type="range" id="cMag" min="0" max="3" step="0.05" value="0">
+      </div>
+      <div class="control">
+        <label>Shift direction &theta; <span class="val" id="thetaVal"></span></label>
+        <input type="range" id="theta" min="-180" max="180" step="1" value="45">
+        <div class="btn-row">
+          <button id="btnAligned" type="button">Aligned (45&deg;)</button>
+          <button id="btnCross" type="button">Cross (&minus;45&deg;)</button>
+          <button id="btnNone" type="button">No shift</button>
+        </div>
+      </div>
+      <div class="control">
+        <label>Shift starts at obs. <span class="val" id="shiftStartVal"></span></label>
+        <input type="range" id="shiftStart" min="1" max="100" step="1" value="26">
+      </div>
+      <div class="control">
+        <label>Control limit h <span class="val" id="hVal"></span></label>
+        <input type="range" id="hRange" min="1" max="30" step="0.01" value="8.63">
+      </div>
+      <div class="control">
+        <label>Auto-tune target ARL<sub>0</sub></label>
+        <div class="btn-row">
+          <select id="arlTarget">
+            <option value="100">100</option>
+            <option value="200" selected>200</option>
+            <option value="370">370 (Shewhart-equiv.)</option>
+            <option value="500">500</option>
+          </select>
+          <button id="btnAutotune" class="primary" type="button">Auto-tune h</button>
+        </div>
+      </div>
+      <div class="control">
+        <label>&nbsp;</label>
+        <div class="btn-row"><button id="btnResample" type="button">Resample noise</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Status</h2>
+    <div id="status"></div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="card chart-panel">
+      <p class="chart-title">Raw observations (X&#8321; vs X&#8322;)</p>
+      <svg id="scatterChart" viewBox="0 0 380 340"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="swatch" style="background:var(--series-1)"></span>pre-shift</span>
+        <span class="legend-item"><span class="swatch" style="background:var(--series-6)"></span>post-shift</span>
+        <span class="legend-item"><span class="swatch dash"></span>99% in-control region</span>
+      </div>
+    </div>
+    <div class="card chart-panel">
+      <p class="chart-title">MEWMA vector path (Z&#8321; vs Z&#8322;)</p>
+      <svg id="trajChart" viewBox="0 0 380 340"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="swatch" style="background:var(--series-1)"></span>Z path (fades in early &rarr; solid late)</span>
+        <span class="legend-item"><span class="swatch" style="background:var(--critical)"></span>signal</span>
+        <span class="legend-item"><span class="swatch dash"></span>T&sup2;=h boundary</span>
+      </div>
+    </div>
+    <div class="card chart-panel">
+      <p class="chart-title">T&sup2; control chart</p>
+      <svg id="t2Chart" viewBox="0 0 380 340"></svg>
+      <div class="legend">
+        <span class="legend-item"><span class="swatch" style="background:var(--series-1)"></span>in control</span>
+        <span class="legend-item"><span class="swatch" style="background:var(--critical)"></span>out of control</span>
+        <span class="legend-item"><span class="swatch dash"></span>h / shift start</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <details class="math">
+      <summary>The formulas behind the knobs</summary>
+      <div class="body">
+        <p>Observations <code>X<sub>i</sub> ~ N<sub>2</sub>(&mu;0, &Sigma;)</code> in control, with &Sigma; = [[1,&rho;],[&rho;,1]] (unit variances, so &rho; alone sets the correlation knob). After the shift point, the mean moves to &mu;0 + (c&middot;cos&theta;, c&middot;sin&theta;).</p>
+        <p>MEWMA recursion: <code>Z<sub>i</sub> = &lambda;X<sub>i</sub> + (1&minus;&lambda;)Z<sub>i&minus;1</sub></code>, <code>Z<sub>0</sub> = &mu;0</code>.</p>
+        <p>Asymptotic covariance: <code>&Sigma;<sub>Z</sub> = [&lambda;/(2&minus;&lambda;)] &Sigma;</code> (steady-state limit, the standard convention for ARL studies &mdash; matching the notebook's Section 9&ndash;10).</p>
+        <p>Chart statistic: <code>T<sup>2</sup><sub>i</sub> = (Z<sub>i</sub>&minus;&mu;0)&prime; &Sigma;<sub>Z</sub><sup>&minus;1</sup> (Z<sub>i</sub>&minus;&mu;0)</code>. A signal occurs the first time <code>T<sup>2</sup><sub>i</sub> &gt; h</code>.</p>
+        <p>"Auto-tune h" runs an in-browser Monte Carlo bisection search (same method as the notebook's Section 9): simulate many in-control runs at a candidate h, measure the average run length (ARL<sub>0</sub>), and adjust h until that average hits your target.</p>
+        <p>Because &Sigma; has equal variances, its eigenvectors are fixed at &plusmn;45&deg; regardless of &rho; (eigenvalues 1&plusmn;&rho;) &mdash; which is what lets both ellipses below be drawn from a closed form rather than a general eigensolver, and also *why* a shift along the (45&deg;) eigenvector direction is easiest to hide from the raw axes but a shift along (&minus;45&deg;, against positive correlation) is the fastest one to catch.</p>
+      </div>
+    </details>
+  </div>
+
+  <footer>
+    Companion to <code>MEWMA_Control_Chart_Tutorial.ipynb</code> in this repository. The MEWMA chart originates with
+    Lowry, Woodall, Champ &amp; Rigdon (1992), <em>A Multivariate Exponentially Weighted Moving Average Control Chart</em>,
+    Technometrics 34(1). Runs entirely client-side &mdash; no data leaves your browser.
+  </footer>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs) {
+    var e = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function css(varName) {
+    return getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(varName).trim();
+  }
+
+  // ---------- seeded PRNG + gaussian ----------
+  function mulberry32(seed) {
+    var a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function makeGaussian(rng) {
+    var spare = null;
+    return function () {
+      if (spare !== null) { var v = spare; spare = null; return v; }
+      var u1 = 0, u2;
+      while (u1 === 0) u1 = rng();
+      u2 = rng();
+      var mag = Math.sqrt(-2.0 * Math.log(u1));
+      spare = mag * Math.sin(2.0 * Math.PI * u2);
+      return mag * Math.cos(2.0 * Math.PI * u2);
+    };
+  }
+
+  var MAX_N = 100;
+  var normalsCache = { seed: null, data: null };
+  function getNormals(seed) {
+    if (normalsCache.seed === seed) return normalsCache.data;
+    var rng = mulberry32(seed);
+    var gaussian = makeGaussian(rng);
+    var data = new Array(MAX_N);
+    for (var i = 0; i < MAX_N; i++) data[i] = [gaussian(), gaussian()];
+    normalsCache = { seed: seed, data: data };
+    return data;
+  }
+
+  function cholesky2(rho) {
+    return { l11: 1, l21: rho, l22: Math.sqrt(Math.max(1 - rho * rho, 1e-9)) };
+  }
+  function sigmaInv2(rho) {
+    var det = Math.max(1 - rho * rho, 1e-9);
+    return { a: 1 / det, b: -rho / det, d: 1 / det };
+  }
+  function ellipsePoints(a, b, nPts) {
+    nPts = nPts || 72;
+    var pts = [];
+    var s2 = Math.SQRT2;
+    for (var i = 0; i <= nPts; i++) {
+      var t = (i / nPts) * 2 * Math.PI;
+      var u = a * Math.cos(t), w = b * Math.sin(t);
+      pts.push([(u + w) / s2, (u - w) / s2]);
+    }
+    return pts;
+  }
+
+  function computeSeries(state) {
+    var normals = getNormals(state.seed);
+    var L = cholesky2(state.rho);
+    var thetaRad = state.theta * Math.PI / 180;
+    var shift = [state.c * Math.cos(thetaRad), state.c * Math.sin(thetaRad)];
+    var n = state.n;
+    var X = new Array(n), Z = new Array(n), T2 = new Array(n);
+    var factor = state.lam / (2 - state.lam);
+    var SI = sigmaInv2(state.rho);
+    var z1 = 0, z2 = 0;
+    var signalIndex = -1;
+    for (var i = 0; i < n; i++) {
+      var mean = (i + 1 >= state.shiftStart) ? shift : [0, 0];
+      var n1 = normals[i][0], n2 = normals[i][1];
+      var e1 = L.l11 * n1, e2 = L.l21 * n1 + L.l22 * n2;
+      var x1 = mean[0] + e1, x2 = mean[1] + e2;
+      X[i] = [x1, x2];
+      z1 = state.lam * x1 + (1 - state.lam) * z1;
+      z2 = state.lam * x2 + (1 - state.lam) * z2;
+      Z[i] = [z1, z2];
+      var t2 = (z1 * (SI.a * z1 + SI.b * z2) + z2 * (SI.b * z1 + SI.d * z2)) / factor;
+      T2[i] = t2;
+      if (signalIndex === -1 && t2 > state.h) signalIndex = i + 1;
+    }
+    return { X: X, Z: Z, T2: T2, signalIndex: signalIndex, shift: shift };
+  }
+
+  function simulateRunLength(gaussian, L, SI, lam, h, shift, maxLen) {
+    var factor = lam / (2 - lam);
+    var z1 = 0, z2 = 0;
+    for (var i = 1; i <= maxLen; i++) {
+      var n1 = gaussian(), n2 = gaussian();
+      var e1 = L.l11 * n1, e2 = L.l21 * n1 + L.l22 * n2;
+      var x1 = shift[0] + e1, x2 = shift[1] + e2;
+      z1 = lam * x1 + (1 - lam) * z1;
+      z2 = lam * x2 + (1 - lam) * z2;
+      var t2 = (z1 * (SI.a * z1 + SI.b * z2) + z2 * (SI.b * z1 + SI.d * z2)) / factor;
+      if (t2 > h) return i;
+    }
+    return maxLen;
+  }
+  function estimateARL(seed, rho, lam, h, shift, nSims, maxLen) {
+    var rng = mulberry32(seed);
+    var gaussian = makeGaussian(rng);
+    var L = cholesky2(rho), SI = sigmaInv2(rho);
+    var sum = 0, runs = new Array(nSims);
+    for (var s = 0; s < nSims; s++) {
+      var rl = simulateRunLength(gaussian, L, SI, lam, h, shift, maxLen);
+      runs[s] = rl; sum += rl;
+    }
+    var mean = sum / nSims, sq = 0;
+    for (s = 0; s < nSims; s++) sq += (runs[s] - mean) * (runs[s] - mean);
+    var se = Math.sqrt(sq / (nSims - 1)) / Math.sqrt(nSims);
+    return [mean, se];
+  }
+  function autotuneH(rho, lam, targetARL0) {
+    var lo = 1.0, hi = 30.0, seedBase = Date.now() % 100000;
+    var mid = 0.5 * (lo + hi);
+    for (var it = 0; it < 10; it++) {
+      mid = 0.5 * (lo + hi);
+      var res = estimateARL(seedBase + it, rho, lam, mid, [0, 0], 1200, 1000);
+      if (res[0] < targetARL0) lo = mid; else hi = mid;
+    }
+    mid = 0.5 * (lo + hi);
+    var confirm = estimateARL(seedBase + 999, rho, lam, mid, [0, 0], 4000, 1500);
+    return { h: mid, arl: confirm[0], se: confirm[1] };
+  }
+
+  // ---------- state ----------
+  var state = { lam: 0.10, rho: 0.80, n: 50, c: 0, theta: 45, shiftStart: 26, h: 8.63, seed: 795 };
+  var autotuneNote = null;
+
+  var ids = ["lam", "rho", "nObs", "cMag", "theta", "shiftStart", "hRange"];
+  function readInputs() {
+    state.lam = parseFloat(document.getElementById("lam").value);
+    state.rho = parseFloat(document.getElementById("rho").value);
+    state.n = parseInt(document.getElementById("nObs").value, 10);
+    state.c = parseFloat(document.getElementById("cMag").value);
+    state.theta = parseFloat(document.getElementById("theta").value);
+    state.shiftStart = parseInt(document.getElementById("shiftStart").value, 10);
+    state.h = parseFloat(document.getElementById("hRange").value);
+  }
+  function syncLabels() {
+    document.getElementById("lamVal").textContent = state.lam.toFixed(2);
+    document.getElementById("rhoVal").textContent = state.rho.toFixed(2);
+    document.getElementById("nVal").textContent = state.n;
+    document.getElementById("cVal").textContent = state.c.toFixed(2);
+    document.getElementById("thetaVal").textContent = state.theta.toFixed(0) + "°";
+    document.getElementById("shiftStartVal").textContent = state.shiftStart;
+    document.getElementById("hVal").textContent = state.h.toFixed(3);
+    var shiftStartInput = document.getElementById("shiftStart");
+    shiftStartInput.max = state.n;
+    if (state.shiftStart > state.n) { state.shiftStart = state.n; shiftStartInput.value = state.n; }
+  }
+
+  // ---------- tooltip ----------
+  var tooltip = document.getElementById("tooltip");
+  function showTip(evt, html) {
+    tooltip.innerHTML = html;
+    tooltip.style.opacity = 1;
+    tooltip.style.left = (evt.clientX + 12) + "px";
+    tooltip.style.top = (evt.clientY + 12) + "px";
+  }
+  function hideTip() { tooltip.style.opacity = 0; }
+
+  // ---------- axis helper ----------
+  function niceStep(range, targetTicks) {
+    var rough = range / targetTicks;
+    var mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    var residual = rough / mag;
+    var nice = residual <= 1 ? 1 : residual <= 2 ? 2 : residual <= 2.5 ? 2.5 : residual <= 5 ? 5 : 10;
+    return nice * mag;
+  }
+  function setupAxes(svg, opts) {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    var W = 380, H = 340;
+    var m = { l: 40, t: 12, r: 14, b: 34 };
+    var pw = W - m.l - m.r, ph = H - m.t - m.b;
+    var xScale = function (v) { return m.l + (v - opts.xDomain[0]) / (opts.xDomain[1] - opts.xDomain[0]) * pw; };
+    var yScale = function (v) { return m.t + ph - (v - opts.yDomain[0]) / (opts.yDomain[1] - opts.yDomain[0]) * ph; };
+
+    var xStep = niceStep(opts.xDomain[1] - opts.xDomain[0], opts.xTicks || 6);
+    var yStep = niceStep(opts.yDomain[1] - opts.yDomain[0], opts.yTicks || 5);
+    var xStart = Math.ceil(opts.xDomain[0] / xStep) * xStep;
+    var yStart = Math.ceil(opts.yDomain[0] / yStep) * yStep;
+
+    for (var xv = xStart; xv <= opts.xDomain[1] + 1e-9; xv += xStep) {
+      svg.appendChild(el("line", { class: "grid-line", x1: xScale(xv), x2: xScale(xv), y1: m.t, y2: m.t + ph }));
+      var lx = el("text", { class: "tick-label", x: xScale(xv), y: m.t + ph + 14, "text-anchor": "middle" });
+      lx.textContent = (Math.abs(xv) < 1e-9 ? 0 : xv).toFixed(opts.xDecimals != null ? opts.xDecimals : 0);
+      svg.appendChild(lx);
+    }
+    for (var yv = yStart; yv <= opts.yDomain[1] + 1e-9; yv += yStep) {
+      svg.appendChild(el("line", { class: "grid-line", x1: m.l, x2: m.l + pw, y1: yScale(yv), y2: yScale(yv) }));
+      var ly = el("text", { class: "tick-label", x: m.l - 6, y: yScale(yv) + 3, "text-anchor": "end" });
+      ly.textContent = (Math.abs(yv) < 1e-9 ? 0 : yv).toFixed(opts.yDecimals != null ? opts.yDecimals : 0);
+      svg.appendChild(ly);
+    }
+    svg.appendChild(el("line", { class: "baseline-line", x1: m.l, x2: m.l + pw, y1: m.t + ph, y2: m.t + ph }));
+    svg.appendChild(el("line", { class: "baseline-line", x1: m.l, x2: m.l, y1: m.t, y2: m.t + ph }));
+
+    var xl = el("text", { class: "axis-label", x: m.l + pw / 2, y: H - 2, "text-anchor": "middle" });
+    xl.textContent = opts.xLabel;
+    svg.appendChild(xl);
+    var yl = el("text", { class: "axis-label", x: 11, y: m.t + ph / 2, "text-anchor": "middle", transform: "rotate(-90 11 " + (m.t + ph / 2) + ")" });
+    yl.textContent = opts.yLabel;
+    svg.appendChild(yl);
+
+    return { xScale: xScale, yScale: yScale, margin: m, pw: pw, ph: ph };
+  }
+
+  function pathFromPoints(pts, scaleX, scaleY) {
+    return pts.map(function (p, i) {
+      return (i === 0 ? "M" : "L") + scaleX(p[0]).toFixed(2) + "," + scaleY(p[1]).toFixed(2);
+    }).join(" ");
+  }
+
+  // ---------- chart 1: scatter ----------
+  function drawScatter(series) {
+    var svg = document.getElementById("scatterChart");
+    var pts = series.X;
+    var maxAbs = 4;
+    pts.forEach(function (p) { maxAbs = Math.max(maxAbs, Math.abs(p[0]), Math.abs(p[1])); });
+    maxAbs = Math.max(maxAbs, Math.abs(series.shift[0]), Math.abs(series.shift[1]));
+    var D = Math.min(9, Math.ceil((maxAbs + 0.6) * 2) / 2);
+    var ax = setupAxes(svg, { xDomain: [-D, D], yDomain: [-D, D], xLabel: "X₁", yLabel: "X₂", xTicks: 6, yTicks: 6, xDecimals: 0, yDecimals: 0 });
+
+    var k = 9.210; // chi-square(2 df), 99%
+    var a = Math.sqrt(k * (1 + state.rho)), b = Math.sqrt(k * Math.max(1 - state.rho, 0));
+    var ell = ellipsePoints(a, b);
+    svg.appendChild(el("path", { d: pathFromPoints(ell, ax.xScale, ax.yScale), fill: "none", stroke: css("--text-muted"), "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
+
+    svg.appendChild(el("line", { x1: ax.xScale(-D), x2: ax.xScale(D), y1: ax.yScale(0), y2: ax.yScale(0), stroke: css("--gridline"), "stroke-width": 1 }));
+
+    if (state.c > 0) {
+      svg.appendChild(el("line", {
+        x1: ax.xScale(0), y1: ax.yScale(0), x2: ax.xScale(series.shift[0]), y2: ax.yScale(series.shift[1]),
+        stroke: css("--series-6"), "stroke-width": 1.5, "stroke-dasharray": "3 3"
+      }));
+      var d = el("path", {
+        d: "M -5,-5 L 5,-5 L 5,5 L -5,5 Z", transform: "translate(" + ax.xScale(series.shift[0]) + "," + ax.yScale(series.shift[1]) + ") rotate(45)",
+        fill: css("--series-6")
+      });
+      svg.appendChild(d);
+    }
+    svg.appendChild(el("path", {
+      d: "M " + (ax.xScale(0) - 5) + "," + ax.yScale(0) + " L " + (ax.xScale(0) + 5) + "," + ax.yScale(0) +
+        " M " + ax.xScale(0) + "," + (ax.yScale(0) - 5) + " L " + ax.xScale(0) + "," + (ax.yScale(0) + 5),
+      stroke: css("--text-secondary"), "stroke-width": 2
+    }));
+
+    pts.forEach(function (p, i) {
+      var post = (i + 1 >= state.shiftStart) && state.c > 0;
+      var c = el("circle", { cx: ax.xScale(p[0]), cy: ax.yScale(p[1]), r: 4.2, fill: post ? css("--series-6") : css("--series-1"), "fill-opacity": 0.82 });
+      c.addEventListener("mouseenter", function (e) { showTip(e, "i=" + (i + 1) + "<br>X₁=" + p[0].toFixed(2) + ", X₂=" + p[1].toFixed(2)); });
+      c.addEventListener("mousemove", function (e) { showTip(e, "i=" + (i + 1) + "<br>X₁=" + p[0].toFixed(2) + ", X₂=" + p[1].toFixed(2)); });
+      c.addEventListener("mouseleave", hideTip);
+      svg.appendChild(c);
+    });
+  }
+
+  // ---------- chart 2: MEWMA trajectory ----------
+  function drawTraj(series) {
+    var svg = document.getElementById("trajChart");
+    var factor = state.lam / (2 - state.lam);
+    var a = Math.sqrt(state.h * factor * (1 + state.rho)), b = Math.sqrt(state.h * factor * Math.max(1 - state.rho, 0));
+    var maxAbs = Math.max(a, b, 0.5);
+    series.Z.forEach(function (p) { maxAbs = Math.max(maxAbs, Math.abs(p[0]), Math.abs(p[1])); });
+    var D = Math.max(0.6, Math.ceil((maxAbs + 0.15) * 5) / 5);
+    var ax = setupAxes(svg, { xDomain: [-D, D], yDomain: [-D, D], xLabel: "Z₁", yLabel: "Z₂", xTicks: 5, yTicks: 5, xDecimals: 2, yDecimals: 2 });
+
+    var ell = ellipsePoints(a, b);
+    svg.appendChild(el("path", { d: pathFromPoints(ell, ax.xScale, ax.yScale), fill: "none", stroke: css("--text-muted"), "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
+
+    svg.appendChild(el("path", { d: pathFromPoints(series.Z, ax.xScale, ax.yScale), fill: "none", stroke: css("--text-secondary"), "stroke-width": 1.4, "stroke-opacity": 0.6 }));
+
+    var n = series.Z.length;
+    series.Z.forEach(function (p, i) {
+      var isSignal = (series.signalIndex === i + 1);
+      var frac = n > 1 ? i / (n - 1) : 1;
+      var r = isSignal ? 6 : 3.6;
+      var c = el("circle", {
+        cx: ax.xScale(p[0]), cy: ax.yScale(p[1]), r: r,
+        fill: isSignal ? css("--critical") : css("--series-1"),
+        "fill-opacity": isSignal ? 1 : (0.28 + 0.62 * frac)
+      });
+      if (isSignal) {
+        c.setAttribute("stroke", css("--critical"));
+        c.setAttribute("stroke-width", "2");
+        c.setAttribute("stroke-opacity", "0.35");
+      }
+      c.addEventListener("mouseenter", function (e) { showTip(e, "i=" + (i + 1) + "<br>Z₁=" + p[0].toFixed(3) + ", Z₂=" + p[1].toFixed(3) + (isSignal ? "<br><b>signal</b>" : "")); });
+      c.addEventListener("mousemove", function (e) { showTip(e, "i=" + (i + 1) + "<br>Z₁=" + p[0].toFixed(3) + ", Z₂=" + p[1].toFixed(3) + (isSignal ? "<br><b>signal</b>" : "")); });
+      c.addEventListener("mouseleave", hideTip);
+      svg.appendChild(c);
+    });
+  }
+
+  // ---------- chart 3: T2 chart ----------
+  function drawT2(series) {
+    var svg = document.getElementById("t2Chart");
+    var n = series.T2.length;
+    var maxT2 = state.h;
+    series.T2.forEach(function (v) { maxT2 = Math.max(maxT2, v); });
+    var yMax = maxT2 * 1.15;
+    var ax = setupAxes(svg, { xDomain: [1, n], yDomain: [0, yMax], xLabel: "observation i", yLabel: "T²", xTicks: 6, yTicks: 5, xDecimals: 0, yDecimals: 1 });
+
+    if (state.shiftStart >= 1 && state.shiftStart <= n && state.c > 0) {
+      var sx = ax.xScale(state.shiftStart);
+      svg.appendChild(el("line", { x1: sx, x2: sx, y1: ax.margin.t, y2: ax.margin.t + ax.ph, stroke: css("--text-muted"), "stroke-width": 1.3, "stroke-dasharray": "3 3" }));
+      var lbl = el("text", { class: "tick-label", x: sx + 3, y: ax.margin.t + 10 });
+      lbl.textContent = "shift"; svg.appendChild(lbl);
+    }
+    var hy = ax.yScale(state.h);
+    svg.appendChild(el("line", { x1: ax.margin.l, x2: ax.margin.l + ax.pw, y1: hy, y2: hy, stroke: css("--text-secondary"), "stroke-width": 1.6, "stroke-dasharray": "5 3" }));
+    var hlbl = el("text", { class: "tick-label", x: ax.margin.l + ax.pw - 2, y: hy - 4, "text-anchor": "end" });
+    hlbl.textContent = "h=" + state.h.toFixed(2); svg.appendChild(hlbl);
+
+    var linePts = series.T2.map(function (v, i) { return [i + 1, v]; });
+    svg.appendChild(el("path", { d: pathFromPoints(linePts, ax.xScale, ax.yScale), fill: "none", stroke: css("--series-1"), "stroke-width": 1.6, "stroke-opacity": 0.55 }));
+
+    series.T2.forEach(function (v, i) {
+      var ooc = v > state.h;
+      var c = el("circle", { cx: ax.xScale(i + 1), cy: ax.yScale(v), r: ooc ? 5 : 3.6, fill: ooc ? css("--critical") : css("--series-1") });
+      c.addEventListener("mouseenter", function (e) { showTip(e, "i=" + (i + 1) + "<br>T²=" + v.toFixed(3) + (ooc ? "<br><b>out of control</b>" : "")); });
+      c.addEventListener("mousemove", function (e) { showTip(e, "i=" + (i + 1) + "<br>T²=" + v.toFixed(3) + (ooc ? "<br><b>out of control</b>" : "")); });
+      c.addEventListener("mouseleave", hideTip);
+      svg.appendChild(c);
+    });
+  }
+
+  function updateStatus(series) {
+    var s = document.getElementById("status");
+    var lines = [];
+    lines.push("<b>λ</b>=" + state.lam.toFixed(2) + " &nbsp; <b>ρ</b>=" + state.rho.toFixed(2) + " &nbsp; <b>h</b>=" + state.h.toFixed(3));
+    if (state.c > 0) {
+      lines.push("Shift of magnitude <b>" + state.c.toFixed(2) + "σ</b> at <b>θ=" + state.theta.toFixed(0) + "°</b>, starting at observation <b>" + state.shiftStart + "</b>.");
+    } else {
+      lines.push("No shift injected &mdash; process stays in control throughout.");
+    }
+    if (series.signalIndex > 0) {
+      lines.push("<span class='flag-ooc'>Signaled at observation " + series.signalIndex + "</span> (run length = " + series.signalIndex + ").");
+    } else {
+      lines.push("<span class='flag-ok'>No signal within the displayed " + state.n + " observations.</span>");
+    }
+    if (autotuneNote) lines.push(autotuneNote);
+    s.innerHTML = lines.join("<br>");
+  }
+
+  function render() {
+    syncLabels();
+    var series = computeSeries(state);
+    drawScatter(series);
+    drawTraj(series);
+    drawT2(series);
+    updateStatus(series);
+  }
+
+  ids.forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () { readInputs(); autotuneNote = null; render(); });
+  });
+  document.getElementById("btnAligned").addEventListener("click", function () {
+    document.getElementById("theta").value = 45; document.getElementById("cMag").value = Math.max(state.c, 1.0);
+    readInputs(); render();
+  });
+  document.getElementById("btnCross").addEventListener("click", function () {
+    document.getElementById("theta").value = -45; document.getElementById("cMag").value = Math.max(state.c, 1.0);
+    readInputs(); render();
+  });
+  document.getElementById("btnNone").addEventListener("click", function () {
+    document.getElementById("cMag").value = 0; readInputs(); render();
+  });
+  document.getElementById("btnResample").addEventListener("click", function () {
+    state.seed = Math.floor(Math.random() * 1e9); readInputs(); render();
+  });
+  document.getElementById("btnAutotune").addEventListener("click", function () {
+    readInputs();
+    var target = parseFloat(document.getElementById("arlTarget").value);
+    var btn = document.getElementById("btnAutotune");
+    var oldText = btn.textContent;
+    btn.textContent = "Tuning…"; btn.disabled = true;
+    setTimeout(function () {
+      var res = autotuneH(state.rho, state.lam, target);
+      document.getElementById("hRange").value = res.h.toFixed(3);
+      readInputs();
+      autotuneNote = "Auto-tuned h for target ARL₀=" + target.toFixed(0) + " → estimated ARL≈" + res.arl.toFixed(1) + " (SE=" + res.se.toFixed(1) + ").";
+      btn.textContent = oldText; btn.disabled = false;
+      render();
+    }, 20);
+  });
+
+  readInputs();
+  render();
+})();
+</script>
